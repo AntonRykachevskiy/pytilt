@@ -1,0 +1,497 @@
+#LyX 2.0 created this file. For more info see http://www.lyx.org/
+\lyxformat 413
+\begin_document
+\begin_header
+\textclass article
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman default
+\font_sans default
+\font_typewriter default
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100
+\font_tt_scale 100
+
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\use_hyperref false
+\papersize default
+\use_geometry false
+\use_amsmath 1
+\use_esint 1
+\use_mhchem 1
+\use_mathdots 1
+\cite_engine basic
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\use_refstyle 1
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Subsection*
+Problem formulation.
+\end_layout
+
+\begin_layout Subsubsection*
+Formulation
+\end_layout
+
+\begin_layout Standard
+As it was mentioned above, we work with the images which after some homography
+ transformation can be represented as a sum of the low rank matrix 
+\begin_inset Formula $A$
+\end_inset
+
+ and a sparse error matrix 
+\begin_inset Formula $E$
+\end_inset
+
+.
+ So we can fromulate the optimization objective in the following way 
+\begin_inset Formula 
+\[
+\min rk(A)+\|E\|_{0}
+\]
+
+\end_inset
+
+Than we add the constraint
+\begin_inset Formula 
+\[
+\tau\ocircle I=A+E
+\]
+
+\end_inset
+
+where 
+\begin_inset Formula $\tau$
+\end_inset
+
+ is the homograpy we are searching for and 
+\begin_inset Formula $I$
+\end_inset
+
+ is the matrix of the original image.
+ As it was show recently [1], this problem usually can be reformulated in
+ the following way:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+\begin{array}{c}
+\min\|A\|_{\sigma}+\|E\|_{1}\\
+\tau\ocircle I=A+E
+\end{array}
+\]
+
+\end_inset
+
+Working with nuclear and the first norm is much more convinient than with
+ rank and zero norm.
+ 
+\end_layout
+
+\begin_layout Subsubsection*
+Summary
+\end_layout
+
+\begin_layout Standard
+Our task will be to write python implementation of TILT, and try to evaluate
+ performa
+\emph on
+nce.
+\end_layout
+
+\begin_layout Subsection*
+Data.
+\end_layout
+
+\begin_layout Standard
+Actually data for this task is floating arround us every second.
+ We used some pictures from original paper[2], and also some pics of Skoltech,
+ chessboard, e.t.c.
+\end_layout
+
+\begin_layout Subsection*
+Evaluation.
+\end_layout
+
+\begin_layout Subsubsection*
+Homography
+\end_layout
+
+\begin_layout Standard
+To strart with let us precisely define the transformations we are working
+ with.
+ Homography is a coordinate transformation which transform lines to lines.
+ In homogenius coordinates it can be represented as 
+\begin_inset Formula $3\times3$
+\end_inset
+
+ matrix.
+ We can think of our image as of the continious function of two variables
+ 
+\begin_inset Formula $I(x,y)$
+\end_inset
+
+, where 
+\begin_inset Formula $I$
+\end_inset
+
+ defines intensity in target point.
+ Let 
+\begin_inset Formula $H$
+\end_inset
+
+ be the matrix of homography, than we transform the coordinates in the following
+ way
+\begin_inset Formula 
+\[
+\left[\begin{array}{c}
+x\\
+y
+\end{array}\right]\rightarrow\left[\begin{array}{c}
+x\\
+y\\
+1
+\end{array}\right]\rightarrow H\left[\begin{array}{c}
+x\\
+y\\
+1
+\end{array}\right]\rightarrow\left[\begin{array}{c}
+u\\
+v\\
+s
+\end{array}\right]\rightarrow\left[\begin{array}{c}
+\frac{u}{s}\\
+\frac{v}{s}\\
+1
+\end{array}\right]\rightarrow\left[\begin{array}{c}
+\frac{u}{s}\\
+\frac{v}{s}
+\end{array}\right]
+\]
+
+\end_inset
+
+And thus intensity is transformed like this
+\begin_inset Formula 
+\[
+\tau\ocircle I(x,y)=I(\frac{u}{s},\frac{v}{s})
+\]
+
+\end_inset
+
+Later we will need a Jacobi matrix of this transformation.
+ 
+\end_layout
+
+\begin_layout Subsubsection*
+Optimization
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+\begin{array}{c}
+\min_{\tau,A,E}\|A\|_{\sigma}+\|E\|_{1}\\
+\tau\ocircle I=A+E
+\end{array}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Objective is convex, but the constrains are strange.
+ So the first idea is to linearise constraints around 
+\begin_inset Formula $\tau_{o}$
+\end_inset
+
+ , solve covex problem using ALM, shift tau, and repeat until convergence.
+ So on each step of outer loop we formulate new problem:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+\begin{array}{c}
+\min_{\Delta\tau,A,E}\|A\|_{\sigma}+\|E\|_{1}\\
+\tau_{0}\ocircle I+\nabla I_{\tau}\Delta\tau=A+E
+\end{array}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+This problem is solved using augmented lagrangian.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+L=\|A\|_{\sigma}+\|E\|_{1}+\left\langle Y,C\right\rangle +\frac{\mu}{2}\|C\|_{F}^{2}
+\]
+
+\end_inset
+
+where 
+\begin_inset Formula $C=\tau_{0}\ocircle I+\nabla I_{\tau}\Delta\tau-A-E$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+Basic iteration looks like this:
+\begin_inset Formula 
+\[
+\begin{array}{c}
+A_{k},E_{k},\Delta\tau_{k}=argminL(Y=Y_{k-1})\\
+Y_{k}=Y_{k-1}-\mu_{k-1}C_{k}\\
+\mu_{k+1}=\rho\mu_{k}
+\end{array}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+And the first minimization is solved one by one for each variable.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement H
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\begin_inset Caption
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename project/linalg/linalg/Screenshot_from_2016-12-11_23-16-28.png
+	width 100text%
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Figure 1, is from original paper [2], describes algorithm in details.
+ 
+\end_layout
+
+\begin_layout Standard
+A little bit more attention should be payed to how we linearize, we need
+ to calculate 
+\begin_inset Formula $\nabla_{\tau}I$
+\end_inset
+
+, where 
+\begin_inset Formula $\tau$
+\end_inset
+
+ should be considered as a parametres of transformation.
+ We calculate it the following way:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+\nabla_{\tau}I=\frac{\partial}{\partial\tau_{i}}I(x,y)=\frac{\partial}{\partial\tau_{i}}I(H(\tau)(u,v))=\frac{\partial I}{\partial u}\frac{\partial u}{\partial\tau_{i}}+\frac{\partial I}{\partial v}\frac{\partial v}{\partial\tau_{i}}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsubsection*
+Additional improvments
+\end_layout
+
+\begin_layout Standard
+First of all we use kind of branch and bound approach to define best initial
+ transformation.
+ We initialize few different rotation matrixes, apply corresponding transformati
+ons to the images, calculate the objective, and choose the one which has
+ lowest objective.
+ We do the same for a set of shift matrix, and set initial matrix as a multiplic
+ation of choosen shifts and rotates.
+ 
+\end_layout
+
+\begin_layout Standard
+The second idea is to blur image before processing, this makes structures
+ 
+\begin_inset Quotes eld
+\end_inset
+
+more low ranked
+\begin_inset Quotes erd
+\end_inset
+
+, for example text becomes more low ranked, after bluring.
+ 
+\end_layout
+
+\begin_layout Standard
+The last idea is to use pyramid approach.
+ To proceed resized image first and than use transformation we obtained
+ as initial for the whole sized picture.
+ This works well, especcially if we need to proceed large images.
+ 
+\end_layout
+
+\begin_layout Subsection*
+Related work
+\end_layout
+
+\begin_layout Standard
+The list of related articles can be found in literature.
+ Actually this exact algorithm was realised on matlab by Visual Computing
+ Group, Microsoft Research Asia, Beijing and Coordinated Science Lab, University
+ of Illinois at Urbana-Champaign [2].
+ Also some job was done to recover the shapes of cilindrical objects with
+ low ranked structers on them[3]
+\end_layout
+
+\begin_layout Subsection*
+Our results
+\end_layout
+
+\begin_layout Subsubsection*
+Code
+\end_layout
+
+\begin_layout Standard
+Working code of TILT on python can be found here https://github.com/AntonRykachev
+skiy/pytilt
+\end_layout
+
+\begin_layout Subsubsection*
+How it looks
+\end_layout
+
+\begin_layout Subsubsection*
+Performance
+\end_layout
+
+\begin_layout Standard
+First of let's see how algorithm without pyramid, blur and branch-and-bound
+ works.
+ Some times it fails to converge to what we expect, and converges to some
+ local minimum, even on quite small error tollerance.
+ 
+\end_layout
+
+\begin_layout Standard
+For some pictures it can be solved appliying blur to image.
+\end_layout
+
+\begin_layout Standard
+We didn't see any convergence failtures when we applied branch-and-bound,
+ cause it usually finds rather good initial approximation.
+ 
+\end_layout
+
+\begin_layout Subsubsection*
+Features
+\end_layout
+
+\begin_layout Standard
+Some times we can apply algorithm to pictures which are not actually lowranked,
+ but have at least some symmetry.
+ For example we can rotate faces.
+ 
+\end_layout
+
+\begin_layout Standard
+Also we made an experimet with 
+\end_layout
+
+\begin_layout Standard
+
+\backslash
+
+\end_layout
+
+\begin_layout Standard
+
+\backslash
+
+\end_layout
+
+\begin_layout Standard
+
+\backslash
+
+\end_layout
+
+\begin_layout Standard
+[1] Candes, E., Li, X., Ma, Y., Wright, J.: Robust principal component analysis
+ preprint (2009)
+\end_layout
+
+\begin_layout Standard
+[2] Zhengdong Zhang y , Xiao Liang y , Arvind Ganesh z , and Yi Ma: TILT:
+ Transform Invariant Low-rank Textures.
+\end_layout
+
+\end_body
+\end_document

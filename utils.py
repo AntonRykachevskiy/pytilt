@@ -226,7 +226,7 @@ def tfm2para(tfm_matrix, XData, YData, mode):
 def transform_point(input_pt, tfm_matrix):
     input_pt = input_pt.reshape(2)
 
-    print input_pt
+    #print input_pt
     pt = np.hstack((input_pt, 1))
 
     output_pt = tfm_matrix.dot(pt)

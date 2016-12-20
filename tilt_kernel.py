@@ -45,11 +45,8 @@ def polina_transform(input_image, tfm_matrix, UData = None,
 
     return img_1
 
-def tilt_kernel(input_image, mode, center, focus_size, initial_tfm_matrix, para):
-
-    outer_tol = 5e-5
-    outer_max_iter = 500
-    outer_display_period = 1
+def tilt_kernel(input_image, mode, center, focus_size, initial_tfm_matrix,
+                outer_tol=1e-5, inner_tol=1e-4, outer_max_iter=500, inner_max_iter=500):
 
     if input_image.shape[2] > 1:
         input_image = input_image[:, :, 0]*0.299 + input_image[:, :, 1]*0.587 + input_image[:, :, 2]*0.144
@@ -57,12 +54,12 @@ def tilt_kernel(input_image, mode, center, focus_size, initial_tfm_matrix, para)
     input_image = input_image.astype(float)
 
     image_center = np.floor(center)
-    print 'im_c', image_center
+    #print 'im_c', image_center
     focus_size = np.floor(focus_size)
-    print 'fs', focus_size
+    #print 'fs', focus_size
     image_size = input_image.shape
 
-    print image_size
+    #print image_size
     focus_center = np.zeros((2,1))
     focus_center[0] = np.floor((focus_size[1])/2)
     focus_center[1] =np.floor((focus_size[0])/2)
@@ -112,9 +109,13 @@ def tilt_kernel(input_image, mode, center, focus_size, initial_tfm_matrix, para)
     outer_round = 0
     pre_f = 0
 
+    error = []
+
     while 1:
         outer_round += 1
-        A, E, delta_tau, f = inner_IALM_constraints(Dotau, J, S)
+        A, E, delta_tau, f = inner_IALM_constraints(Dotau, J, S, tol=inner_tol, max_iter=inner_max_iter)
+
+        error.append(np.abs(f - pre_f))
 
         tau = tau + delta_tau
 
@@ -139,4 +140,4 @@ def tilt_kernel(input_image, mode, center, focus_size, initial_tfm_matrix, para)
         J = jacobi(du, dv, XData, YData, tau, mode)
         S = constraints(tau, XData, YData, mode)
 
-    return Dotau, A, E, tfm_matrix, UData, VData, XData, YData, A_scale, Dotau_series
+    return Dotau, A, E, tfm_matrix, UData, VData, XData, YData, A_scale, Dotau_series, error, outer_round,

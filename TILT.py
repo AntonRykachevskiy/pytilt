@@ -4,7 +4,7 @@ from utils import *
 import os
 
 
-def TILT(input_image, mode, init_points, **kwargs):
+def TILT(input_image, mode, init_points, outer_tol=1e-5, inner_tol=1e-4, outer_max_iter=500, inner_max_iter=500, **kwargs):
     args = parse_TILT_arguments(**kwargs)
     args['mode'] = mode
     args['input_image'] = input_image
@@ -89,7 +89,7 @@ def TILT(input_image, mode, init_points, **kwargs):
                 candidate_matrix[0, i, :2, :2] = np.array(
                     [[np.cos(theta), - np.sin(theta)], [np.sin(theta), np.cos(theta)]])
 
-        if args['mode'] == 'affine' or args['mode'] == 'homography':
+        if args['mode'] == 'homography':
             max_rotation = args['branch_max_rotation']
             max_skew = args['branch_max_skew']
             level = 3
@@ -114,8 +114,7 @@ def TILT(input_image, mode, init_points, **kwargs):
         args['display_result'] = 0
         for i in range(level):
             for j in range(2 * args['branch_accuracy'] + 1):
-                tfm_matrix = np.linalg.inv(
-                    candidate_matrix[i, j, :, :].dot(np.linalg.inv(initial_tfm_matrix)))  ### don't want mess with this
+                tfm_matrix = np.linalg.inv(candidate_matrix[i, j, :, :].dot(np.linalg.inv(initial_tfm_matrix)))
                 args['figure_no'] = (i - 1) * level + j
                 args['save_path'] = []
 
@@ -148,7 +147,9 @@ def TILT(input_image, mode, init_points, **kwargs):
         upsample_matrix = np.linalg.inv(downsample_matrix)
         total_scale = np.ceil(np.max(np.log2(np.min(args['focus_size'])/args['focus_threshold']), 0));
 
+
         for scale in range(int(total_scale),-1,-1):
+            #print 'ts', scale
             # begin each level of the pyramid
             if total_scale - scale >= args['pyramid_max_level']:
                 break
@@ -164,8 +165,6 @@ def TILT(input_image, mode, init_points, **kwargs):
 
             # prepare image and initial tfm_matrix
             scale_matrix = np.linalg.matrix_power(downsample_matrix, scale)
-            #tfm = maketform('projective', scale_matrix');
-            #input_image=imtransform(input_image, tfm, 'bicubic');
 
             input_image = polina_transform(input_image, scale_matrix, inv_flag = False)
 
@@ -177,7 +176,12 @@ def TILT(input_image, mode, init_points, **kwargs):
 
             #args['save_path'] = fullfile(parent_path, ['pyramid', num2str(scale)]);
             #args.figure_no=100+total_scale-scale+1;
-            Dotau, A, E, tfm_matrix, UData, VData, XData, YData, A_scale, Dotau_series = tilt_kernel(input_image, args['mode'], center, focus_size, tfm_matrix, args)
+            Dotau, A, E, tfm_matrix, UData, VData, XData, YData, A_scale, Dotau_series, error, outer_round= tilt_kernel(input_image,
+                                                                                                                        args['mode'],
+                                                                                                                        center,
+                                                                                                                        focus_size,
+                                                                                                                        tfm_matrix,
+                                                                                                                        outer_tol, inner_tol, outer_max_iter, inner_max_iter)
             # update tfm_matrix of the highest-resolution level.
             initial_tfm_matrix = np.linalg.inv(scale_matrix).dot(tfm_matrix).dot(scale_matrix)
             args['outer_tol']=args['outer_tol']*args['outer_tol_step']
@@ -205,13 +209,15 @@ def TILT(input_image, mode, init_points, **kwargs):
 
         args['figure_no'] = 101
         args['save_path'] = os.path.join(parent_path, 'some_name')
-        # POLINA: below seems to be a mistake
-        Dotau, A, E, tfm_matrix, UData, VData, XData, YData, A_scale, Dotau_series = tilt_kernel(input_image,
-                                                                                                 args['mode'],
-                                                                                                 args['center'],
-                                                                                                 args['focus_size'],
-                                                                                                 initial_tfm_matrix,
-                                                                                                 args)
+
+
+
+        Dotau, A, E, tfm_matrix, UData, VData, XData, YData, A_scale, Dotau_series, error, outer_round = tilt_kernel(input_image,
+                                                                                                                     args['mode'],
+                                                                                                                     args['center'],
+                                                                                                                     args['focus_size'],
+                                                                                                                     initial_tfm_matrix,
+                                                                                                                     outer_tol, inner_tol, outer_max_iter, inner_max_iter)
     args = original_args
     tfm_matrix = np.dot(pre_scale_matrix,np.dot(tfm_matrix,np.linalg.inv(pre_scale_matrix)))
 
@@ -228,7 +234,7 @@ def TILT(input_image, mode, init_points, **kwargs):
     XData = np.array([1-focus_center[0], args['focus_size'][1]-focus_center[0]])
     YData = np.array([1-focus_center[1], args['focus_size'][0]-focus_center[1]])
 
-    print 'focus_size', focus_size, 'focus_center', focus_center
+    #print 'focus_size', focus_size, 'focus_center', focus_center
 
     top_left = np.array([XData[0], YData[0]])
     top_right = np.array([XData[1], YData[0]])
@@ -276,4 +282,4 @@ def TILT(input_image, mode, init_points, **kwargs):
 
     plt.show()
 
-    return Dotau_series, Dotau, A, E, tfm_matrix, U_, V_, X_, Y_ #UData, VData, XData, YData
+    return Dotau_series, Dotau, A, E, tfm_matrix, U_, V_, X_, Y_, error, outer_round #UData, VData, XData, YData

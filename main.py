@@ -4,7 +4,7 @@ import cv2
 
 
 from TILT import TILT
-from tilt_kernel import  polina_transform
+from tilt_kernel import polina_transform
 
 
 class Img():
@@ -52,7 +52,8 @@ if __name__ == '__main__':
     plt.imshow(img[init_points[1][0]: init_points[1][1], init_points[0][0]: init_points[0][1]])
     plt.show()
 
-    Ds, Dotau, A, E, tfm_matrix, UData, VData, XData, YData = TILT(img, 'homography', init_points, blur=0, pyramid=1, branch=1)
+    Ds, Dotau, A, E, tfm_matrix, UData, VData, XData, YData, error, outer_round = TILT(img, 'homography', init_points, inner_max_iter=1,
+                                                                                       outer_max_iter=1, blur=0, pyramid=1, branch=1)
 
     plt.imshow(A)
     plt.show()
